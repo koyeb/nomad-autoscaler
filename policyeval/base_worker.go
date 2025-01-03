@@ -482,6 +482,12 @@ func (h *checkHandler) start(ctx context.Context, currentStatus *sdk.TargetStatu
 	// Only evaluate this check if the current count of instances is within
 	// the check's [min, max] limits
 	h.checkEval.Action.IgnoreOutOfBounds(currentStatus.Count, h.checkEval.Check.ScalingMin, h.checkEval.Check.ScalingMax)
+	h.logger.Debug("Finished running policy check",
+		"desired_count", h.checkEval.Action.Count,
+		"direction", h.checkEval.Action.Direction,
+		"reason", h.checkEval.Action.Reason,
+		"meta", h.checkEval.Action.Meta,
+	)
 
 	// Skip action if count doesn't change.
 	if currentStatus.Count == h.checkEval.Action.Count {

@@ -332,6 +332,7 @@ func (w *BaseWorker) scaleTarget(
 	logger.Debug("successfully submitted scaling action to target",
 		"desired_count", action.Count)
 	metrics.IncrCounterWithLabels([]string{"scale", "invoke", "success_count"}, 1, metricLabels)
+	logger.Debug("Counter incremented")
 
 	// Enforce the cooldown after a successful scaling event.
 	w.policyManager.EnforceCooldown(policy.ID, policy.Cooldown)

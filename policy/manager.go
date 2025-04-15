@@ -203,6 +203,7 @@ func (m *Manager) stopHandler(h *Handler) {
 func (m *Manager) EnforceCooldown(id string, t time.Duration) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
+	m.log.Debug("cooldown lock aquired", "policy_id", id)
 
 	// Attempt to grab the handler and pass the enforcement onto the
 	// implementation. Its possible cooldown is requested on a policy which
@@ -214,6 +215,7 @@ func (m *Manager) EnforceCooldown(id string, t time.Duration) {
 	// skew the cooldown period, but this is likely very small.
 	if handler, ok := m.handlers[PolicyID(id)]; ok && handler.cooldownCh != nil {
 		handler.cooldownCh <- t
+		m.log.Debug("cooldown chan sent", "policy_id", id)
 	} else {
 		m.log.Debug("attempted to set cooldown on non-existent handler", "policy_id", id)
 	}

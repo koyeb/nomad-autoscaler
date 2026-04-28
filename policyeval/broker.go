@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	metrics "github.com/armon/go-metrics"
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/nomad-autoscaler/sdk"
 	"github.com/hashicorp/nomad-autoscaler/sdk/helper/uuid"
@@ -109,11 +110,24 @@ func NewBroker(l hclog.Logger, timeout time.Duration, deliveryLimit int) *Broker
 	}
 }
 
+// emitMetricsLocked emits broker metrics. Must be called with b.l held.
+func (b *Broker) emitMetricsLocked() {
+	for queue, pending := range b.pendingEvals {
+		metrics.SetGaugeWithLabels(
+			[]string{"broker", "pending_evals_num"},
+			float32(pending.Len()),
+			[]metrics.Label{{Name: "queue", Value: queue}},
+		)
+	}
+	metrics.SetGauge([]string{"broker", "enqueued_policies_num"}, float32(len(b.enqueuedPolicies)))
+}
+
 // Enqueue adds an eval to the broker.
 func (b *Broker) Enqueue(eval *sdk.ScalingEvaluation) {
 	b.l.Lock()
 	defer b.l.Unlock()
 	b.enqueueLocked(eval, "")
+	b.emitMetricsLocked()
 }
 
 func (b *Broker) enqueueLocked(eval *sdk.ScalingEvaluation, token string) {
@@ -220,6 +234,8 @@ func (b *Broker) Dequeue(ctx context.Context, queue string) (*sdk.ScalingEvaluat
 	// Increment dequeue counter.
 	b.enqueuedEvals[eval.ID] += 1
 
+	b.emitMetricsLocked()
+
 	logger.Debug("eval dequeued",
 		"eval_id", eval.ID, "policy_id", eval.Policy.ID, "token", token)
 	return eval, token, nil
@@ -294,6 +310,8 @@ func (b *Broker) Ack(evalID, token string) error {
 	delete(b.enqueuedEvals, evalID)
 	delete(b.enqueuedPolicies, unack.Eval.Policy.ID)
 
+	b.emitMetricsLocked()
+
 	b.logger.Debug("eval ack'd", "policy_id", unack.Eval.Policy.ID)
 	return nil
 }
@@ -330,11 +348,13 @@ func (b *Broker) Nack(evalID, token string) error {
 
 		delete(b.enqueuedEvals, evalID)
 		delete(b.enqueuedPolicies, unack.Eval.Policy.ID)
+		b.emitMetricsLocked()
 		return nil
 	}
 
 	// Re-enqueue eval to try again.
 	b.enqueueLocked(unack.Eval, token)
+	b.emitMetricsLocked()
 	logger.Info("eval nack'd, retrying it")
 	return nil
 }

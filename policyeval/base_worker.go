@@ -117,6 +117,10 @@ func (w *BaseWorker) handlePolicy(ctx context.Context, eval *sdk.ScalingEvaluati
 		return fmt.Errorf("failed to get target status: %v", err)
 	}
 
+	if currentStatus == nil {
+		return fmt.Errorf("target status cannot be nil, policy id: %s", eval.Policy.ID)
+	}
+
 	if !currentStatus.Ready {
 		return errTargetNotReady
 	}

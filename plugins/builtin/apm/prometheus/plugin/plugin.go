@@ -134,7 +134,13 @@ func (a *APMPlugin) Query(q string, r sdk.TimeRange) (sdk.TimestampedMetrics, er
 }
 
 func (a *APMPlugin) QueryMultiple(q string, r sdk.TimeRange) ([]sdk.TimestampedMetrics, error) {
-	a.logger.Debug("querying Prometheus", "query", q, "range", r)
+	// Truncate long queries to reduce log volume
+	const maxQueryLogLen = 200
+	loggedQuery := q
+	if len(q) > maxQueryLogLen {
+		loggedQuery = q[:maxQueryLogLen] + "...[truncated]"
+	}
+	a.logger.Debug("querying Prometheus", "query", loggedQuery, "range", r)
 
 	v1api := v1.NewAPI(a.client)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

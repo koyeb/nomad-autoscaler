@@ -92,7 +92,9 @@ func (s *Source) ReloadIDsMonitor() {
 func (s *Source) MonitorIDs(ctx context.Context, req policy.MonitorIDsReq) {
 	s.log.Debug("starting policy blocking query watcher")
 
-	q := &api.QueryOptions{WaitIndex: 1}
+	// Bind the query to ctx so cancelling the monitor also aborts any
+	// in-flight blocking query instead of leaking the goroutine that runs it.
+	q := (&api.QueryOptions{WaitIndex: 1}).WithContext(ctx)
 
 	for {
 		var (
@@ -182,7 +184,11 @@ func (s *Source) MonitorPolicy(ctx context.Context, req policy.MonitorPolicyReq)
 
 	log.Trace("starting policy blocking query watcher")
 
-	q := &api.QueryOptions{WaitIndex: 1}
+	// Bind the query to ctx so that cancelling the handler (e.g. when the
+	// policy is removed) also aborts any in-flight blocking query. Without
+	// this the goroutine performing GetPolicy below is abandoned and stays
+	// parked in the Nomad API call, leaking a goroutine per removal.
+	q := (&api.QueryOptions{WaitIndex: 1}).WithContext(ctx)
 	for {
 		var (
 			p    *api.ScalingPolicy
